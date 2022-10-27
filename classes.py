@@ -1,8 +1,12 @@
+from distutils.command.upload import upload
+from re import U
 from tkinter import *
 import socket
 import time
 import threading
 from datetime import datetime
+from tkinter.filedialog import *
+from turtle import up
 
 class Chat:
 
@@ -33,6 +37,7 @@ class Chat:
         self.txt_field = Entry(self.canva, width = 85, border = 1, bg = 'white')
         self.send_button = Button(self.canva, text = "Enviar", padx = 40, command = self.send)
         self.clean_button = Button(self.canva, text = "Limpar", padx = 40, command = self.clean)
+        self.upload_button = Button(self.canva, text = "Arquivo", padx = 40, command = self.upload)
         
         #Posicionando os Widgets
         self.txt_chat.config(background = "#363636", foreground='white')
@@ -40,12 +45,24 @@ class Chat:
         self.txt_field.grid(column = 0, row = 1, columnspan = 2)
         self.send_button.grid(column = 2, row = 1)
         self.clean_button.grid(column = 3, row = 1)
+        self.upload_button.grid(column = 4, row = 1)
     
+    def upload(self):
+        self.window.filename = askopenfile()
+        print(self.window.filename)
+        print(self.window.filename.name)
+        imagem = PhotoImage(file=self.window.filename.name)
+        foto = Label(self.window, image=imagem)
+        foto.grid(row=1,column=1)
+        self.txt_chat.window_create(END, imagem)
+        #self.txt_chat.image_create(END, image=imagem)
+        #self.window.pack()
+
+
     def clean(self):
         #Limpando tela de mensagens
         self.txt_chat.delete("1.0", "end") 
     
-
     def send(self, event = None):
         self.text = self.txt_field.get()
         text_aux = self.text.replace(' ', '')
