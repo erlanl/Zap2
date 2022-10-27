@@ -44,7 +44,9 @@ class Chat:
     
     def clean(self):
         #Limpando tela de mensagens
+        self.txt_chat.configure(state=NORMAL)
         self.txt_chat.delete("1.0", "end") 
+        self.txt_chat.configure(state=DISABLED)
     
 
     def send(self, event = None):
