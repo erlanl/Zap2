@@ -41,20 +41,25 @@ class Chat:
         self.send_button.grid(column = 2, row = 1)
 
     def send(self, event = None):
-        self.texto = self.txt_field.get()
-        self.txt_chat.insert(END, self.name + ": " + self.texto + '\n')
-        self.txt_field.delete(0, END)
+        self.text = self.txt_field.get()
+        text_aux = self.text.replace(' ', '')
 
-        #Enviando a mensagem para o outro usuário
-        try:
-            self.client_p2p.send(self.texto.encode('utf-8'))
-        except:
-            pass
+        #Impedindo o envio de mensagens vazias
+        if text_aux != "":
+            current_time = "<" + datetime.now().strftime('%d/%m/%Y-%H:%M') + "h" + "> "
+            self.txt_chat.insert(END, current_time + self.name + ": " + self.text + '\n')
+            self.txt_field.delete(0, END)
+
+            #Enviando a mensagem para o outro usuário
+            try:
+                self.client_p2p.send(self.text.encode('utf-8'))
+            except:
+                pass
 
     def receive(self, text):
-        self.text = text + "\n"
-        print(self.text)
-        self.txt_chat.insert(END, self.text)
+        self.text_received = text + "\n"
+        current_time = "<" + datetime.now().strftime('%d-%m-%Y %H:%M') + "h" + "> "
+        self.txt_chat.insert(END, current_time + self.text_received)
 
     def connect_server(self):
         #Abrindo conexão com o server
@@ -100,8 +105,8 @@ class Login:
         self.canva.grid(columnspan = 3)
         self.createWidgets()
 
-        self.texto_nome = ""
-        self.texto_porta = ""
+        self.text_nome = ""
+        self.text_porta = ""
 
     def createWidgets(self):
 
@@ -126,13 +131,13 @@ class Login:
     def send(self, event = None):
 
         #Pegando as infromações de nome e porta e fechando a janela
-        self.texto_nome = self.txt_name.get()
-        self.texto_porta = int(self.txt_port.get())
+        self.text_nome = self.txt_name.get()
+        self.text_porta = int(self.txt_port.get())
         self.window.destroy()
 
     def start(self):
         self.window.mainloop()
-        return self.texto_nome, self.texto_porta
+        return self.text_nome, self.text_porta
 
 class Server:
 
