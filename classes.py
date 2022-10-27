@@ -13,7 +13,7 @@ class Chat:
 
         #Declarando as informações da janela
         self.window = Tk()
-        self.window.title(f"Chat Aberto - {self.name}")
+        self.window.title(f"Chat P2P de {self.name}")
         self.canva = Canvas(self.window, width = largura, height = altura)
         self.canva.grid(columnspan = 3)
         self.createWidgets()
@@ -28,17 +28,23 @@ class Chat:
         thread_get_message.start()
 
     def createWidgets(self):
-        
         #Declarando os widgets do chat
         self.txt_chat = Text(self.canva, border = 1)
         self.txt_field = Entry(self.canva, width = 85, border = 1, bg = 'white')
         self.send_button = Button(self.canva, text = "Enviar", padx = 40, command = self.send)
+        self.clean_button = Button(self.canva, text = "Limpar", padx = 40, command = self.clean)
         
         #Posicionando os Widgets
         self.txt_chat.config(background = "#363636", foreground='white')
         self.txt_chat.grid(column = 0, row = 0, columnspan = 3)
         self.txt_field.grid(column = 0, row = 1, columnspan = 2)
         self.send_button.grid(column = 2, row = 1)
+        self.clean_button.grid(column = 3, row = 1)
+    
+    def clean(self):
+        #Limpando tela de mensagens
+        self.txt_chat.delete("1.0", "end") 
+    
 
     def send(self, event = None):
         self.text = self.txt_field.get()
@@ -46,7 +52,7 @@ class Chat:
 
         #Impedindo o envio de mensagens vazias
         if text_aux != "":
-            current_time = "<" + datetime.now().strftime('%d/%m/%Y-%H:%M') + "h" + "> "
+            current_time = "<" + datetime.now().strftime('%d/%m/%Y %H:%M') + "h" + "> "
             self.txt_chat.insert(END, current_time + self.name + ": " + self.text + '\n')
             self.txt_field.delete(0, END)
 
@@ -58,7 +64,7 @@ class Chat:
 
     def receive(self, text):
         self.text_received = text + "\n"
-        current_time = "<" + datetime.now().strftime('%d-%m-%Y %H:%M') + "h" + "> "
+        current_time = "<" + datetime.now().strftime('%d/%m/%Y %H:%M') + "h" + "> "
         self.txt_chat.insert(END, current_time + self.text_received)
 
     def connect_server(self):
@@ -119,7 +125,7 @@ class Login:
         self.txt_port = Entry(self.canva, width = 85, border = 1, bg = 'white')   
 
         #Declarando o Botão
-        self.send_button = Button(self.canva, text = "Enviar", padx = 40, command = self.send)
+        self.send_button = Button(self.canva, text = "Enviar", padx = 40, command = self.send)        
         
         #Posicionando os Widgets
         self.label1.grid(column = 0, row = 1, columnspan = 1)
@@ -128,8 +134,8 @@ class Login:
         self.txt_port.grid(column = 1, row = 5, columnspan = 3)
         self.send_button.grid(column = 5, row = 1)
 
-    def send(self, event = None):
 
+    def send(self, event = None):
         #Pegando as infromações de nome e porta e fechando a janela
         self.text_nome = self.txt_name.get()
         self.text_porta = int(self.txt_port.get())
