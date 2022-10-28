@@ -87,10 +87,7 @@ class Chat:
         
         elif (tipo_arquivo in ['mp3', 'wav']):
             pygame.mixer.init()               
-                       
-            #self.play_button = Button(self.window, text="Play Song", padx = 40, command=self.playSong)
-            #self.play_button.grid(row=0, column=0, sticky="nw")
-
+                    
             self.txt_chat.window_create(END, window=Button(self.window, text="Play Song", padx = 40, command=self.playSong))
             self.txt_chat.insert(END, '\n')
 
@@ -99,7 +96,6 @@ class Chat:
 
             self.txt_chat.window_create(END, window=Button(self.window, text="Play Video", padx = 40, command=self.playVideo))
             self.txt_chat.insert(END, '\n')
-        
 
 
     def clean(self):
@@ -245,3 +241,93 @@ class Server:
 
         #Fecha a conexão do server
         self.server.close()
+
+class UDP:
+
+    def __int__(self):
+        self.port = 50000
+        self.sock_udt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.serverAddressPort = ('localhost', self.port)
+        self.contador = 0
+    
+    def emissor_rdt(self, data):
+        #Preparando o pacote
+        self.make_pkt_emissor(self.contador, data)
+        #Enviando o pacote
+        self.sock_udt.sendto(self.pkt_emissor, self.serverAddressPort)
+
+        #Mudando o número de sequência
+        if (self.contador == 0):
+            self.contador = 1
+        else:
+            self.contador = 0
+        
+        #Recebendo pacote
+        msgFromReceptor = self.sock_udt.recvfrom(1024).split(',')
+
+        #Se o pacote não tiver o ack com o número de sequência antes da alteração ou estiver corrompido, chegou errado
+        if (msgFromReceptor[1] == 'ACK' and (msgFromReceptor.split()[0] == '{self.contador}' or self.corrupt(msgFromReceptor))):
+            #tempo tem que ficar passando
+            pass
+
+            #se deu timeout, reenvia o pacote
+            '''if (timeout):
+                self.sock_udt.sendto(self.pkt_emissor, self.serverAddressPort)
+                #reinicia o contador
+                self.start_time()'''
+
+        #Se o pacote tiver o ack desejado e não estiver corrompido, para o timer
+        elif (msgFromReceptor.split()[1] == 'ACK' and (msgFromReceptor.split()[0] != '{self.contador}' or ~self.corrupt(msgFromReceptor))):
+            self.stop_time()
+
+    
+    def receptor_rdt(self):
+        msgFromEmissor = self.sock_udt.recvfrom(1024).split(',')
+
+        #chegou corretamente
+        if (~self.corrupt(msgFromEmissor) and msgFromEmissor[0] != self.contador):
+            data = msgFromEmissor[1]
+
+            if (self.contador == 0):
+                self.make_pkt_receptor(0, 'ACK')
+            else:
+                self.make_pkt_receptor(1, 'ACK')
+
+            #compute checksum
+
+            self.sock_udt.sendto(self.pkt_receptor, self.serverAddressPort)
+    
+
+    def checksum(self, byte_msg):
+        total = 0
+        length = len(byte_msg)  # length of the byte message object
+        i = 0
+
+        while length > 1:
+            total += ((byte_msg[i + 1] << 8) & 0xFF00) + ((byte_msg[i]) & 0xFF)
+            i += 2
+            length -= 2
+
+        if length > 0:
+            total += (byte_msg[i] & 0xFF)
+
+        while (total >> 16) > 0:
+            total = (total & 0xFFFF) + (total >> 16)
+
+        total = ~total
+
+        return total & 0xFFFF
+    
+    def make_pkt_emissor(self, contador, data):
+        self.pkt_emissor = {contador + ',' + data + ',' + self.checksum(bytes(data))}
+        self.start_time()
+    
+    def make_pkt_receptor(self, contador, data):
+        self.pkt_receptor = {contador + ',' + data + ',' + self.checksum(bytes(data))}
+    
+    def start_time(self):
+        pass
+
+    def corrupt(self, pkt):
+        checksum_analise = self.checksum(bytes(pkt[1]))
+        return checksum_analise != pkt[2]
