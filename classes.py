@@ -5,11 +5,13 @@ import socket
 import time
 import threading
 from datetime import datetime
+from tkinter import filedialog
 from tkinter.filedialog import *
+from tkinter.scrolledtext import ScrolledText
 from turtle import up
 from PIL import Image, ImageTk
-
-MAX_WIDTH = 512
+import pygame
+import moviepy.editor
 
 class Chat:
 
@@ -23,6 +25,7 @@ class Chat:
         self.window.title(f"Chat P2P de {self.name}")
         self.canva = Canvas(self.window, width = largura, height = altura)
         self.canva.grid(columnspan = 3)
+        self.listImages = []
         self.createWidgets()
 
         #Conectando com o server
@@ -36,11 +39,13 @@ class Chat:
 
     def createWidgets(self):
         #Declarando os widgets do chat
-        self.txt_chat = Text(self.canva, border = 1)
+        self.txt_chat = ScrolledText(self.canva, border = 1)
+        self.txt_chat.pack()
         self.txt_field = Entry(self.canva, width = 85, border = 1, bg = 'white')
         self.send_button = Button(self.canva, text = "Enviar", padx = 40, command = self.send)
         self.clean_button = Button(self.canva, text = "Limpar", padx = 40, command = self.clean)
         self.upload_button = Button(self.canva, text = "Arquivo", padx = 40, command = self.upload)
+        
         
         #Posicionando os Widgets
         self.txt_chat.config(background = "#363636", foreground='white')
@@ -50,21 +55,49 @@ class Chat:
         self.clean_button.grid(column = 3, row = 1)
         self.upload_button.grid(column = 4, row = 1)
     
+    def playSong(self):
+        pygame.mixer.music.load(self.window.filename)
+        pygame.mixer.music.play(loops=0)
+
+    def playVideo(self):
+        # global video
+        video = moviepy.editor.VideoFileClip(self.window.filename)
+        video.preview()
+        pygame.quit() 
+    
     def upload(self):
-        self.window.filename = askopenfilename()
-        imagem = Image.open(self.window.filename)
-        if(imagem.width > MAX_WIDTH):
-            size = int(imagem.width/MAX_WIDTH)
-            imagem = imagem.resize((50,50))
-        imagem = ImageTk.PhotoImage(imagem)
-        # print(self.window.filename)
-        # print(self.window.filename.name)
-        # imagem = PhotoImage(file=self.window.filename.name)
-        foto = Label(self.window, image=imagem)
-        foto.grid(row=0,column=1)
-        self.txt_chat.window_create(END, imagem)
-        #self.txt_chat.image_create(END, image=imagem)
-        #self.window.pack()
+        global imagem
+        self.window.filename = filedialog.askopenfilename()
+        nome_arquivo = self.window.filename.split('.')
+        tipo_arquivo = nome_arquivo[len(nome_arquivo) - 1]
+
+        if(tipo_arquivo in ['jpg', 'jpeg', 'png', 'svg', 'bmp']):
+            size = (self.txt_chat.winfo_width(), self.txt_chat.winfo_width())
+            imagem = Image.open(self.window.filename)
+            if(imagem.width > size[0]//2 or imagem.height > size[1]//2):
+                nu = (imagem.width//(size[0]//2) if imagem.width//(size[0]//2) > imagem.height//(size[1]//2) else imagem.height//(size[1]//2))
+                imagem = imagem.resize((imagem.width//nu,imagem.height//nu))
+            imagem = ImageTk.PhotoImage(imagem)
+
+            self.txt_chat.image_create(END, image=imagem)
+            self.txt_chat.insert(END, '\n')
+            self.listImages.append(imagem)
+        
+        elif (tipo_arquivo in ['mp3', 'wav']):
+            pygame.mixer.init()               
+                       
+            self.play_button = Button(self.window, text="Play Song", padx = 40, command=self.playSong)
+            self.play_button.grid(row=0, column=0, sticky="nw")
+
+            self.txt_chat.window_create(END, self.play_button)
+
+        elif (tipo_arquivo in ['mp4', 'mkv', 'gif']):
+            pygame.init()
+
+            self.play_video_button = Button(self.window, text="Play Video", padx = 40, command=self.playVideo)
+            self.play_video_button.grid(row=0, column=0, sticky="nw")
+            self.txt_chat.window_create(END, self.play_video_button)
+        
 
 
     def clean(self):
