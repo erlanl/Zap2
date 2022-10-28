@@ -7,6 +7,9 @@ import threading
 from datetime import datetime
 from tkinter.filedialog import *
 from turtle import up
+from PIL import Image, ImageTk
+
+MAX_WIDTH = 512
 
 class Chat:
 
@@ -48,12 +51,17 @@ class Chat:
         self.upload_button.grid(column = 4, row = 1)
     
     def upload(self):
-        self.window.filename = askopenfile()
-        print(self.window.filename)
-        print(self.window.filename.name)
-        imagem = PhotoImage(file=self.window.filename.name)
+        self.window.filename = askopenfilename()
+        imagem = Image.open(self.window.filename)
+        if(imagem.width > MAX_WIDTH):
+            size = int(imagem.width/MAX_WIDTH)
+            imagem = imagem.resize((50,50))
+        imagem = ImageTk.PhotoImage(imagem)
+        # print(self.window.filename)
+        # print(self.window.filename.name)
+        # imagem = PhotoImage(file=self.window.filename.name)
         foto = Label(self.window, image=imagem)
-        foto.grid(row=1,column=1)
+        foto.grid(row=0,column=1)
         self.txt_chat.window_create(END, imagem)
         #self.txt_chat.image_create(END, image=imagem)
         #self.window.pack()
