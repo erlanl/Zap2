@@ -60,13 +60,15 @@ class Chat:
         pygame.mixer.music.play(loops=0)
 
     def playVideo(self):
-        # global video
         video = moviepy.editor.VideoFileClip(self.window.filename)
         video.preview()
         pygame.quit() 
     
     def upload(self):
         global imagem
+        global play_button
+        global play_video_button
+
         self.window.filename = filedialog.askopenfilename()
         nome_arquivo = self.window.filename.split('.')
         tipo_arquivo = nome_arquivo[len(nome_arquivo) - 1]
@@ -86,17 +88,17 @@ class Chat:
         elif (tipo_arquivo in ['mp3', 'wav']):
             pygame.mixer.init()               
                        
-            self.play_button = Button(self.window, text="Play Song", padx = 40, command=self.playSong)
-            self.play_button.grid(row=0, column=0, sticky="nw")
+            #self.play_button = Button(self.window, text="Play Song", padx = 40, command=self.playSong)
+            #self.play_button.grid(row=0, column=0, sticky="nw")
 
-            self.txt_chat.window_create(END, self.play_button)
+            self.txt_chat.window_create(END, window=Button(self.window, text="Play Song", padx = 40, command=self.playSong))
+            self.txt_chat.insert(END, '\n')
 
         elif (tipo_arquivo in ['mp4', 'mkv', 'gif']):
             pygame.init()
 
-            self.play_video_button = Button(self.window, text="Play Video", padx = 40, command=self.playVideo)
-            self.play_video_button.grid(row=0, column=0, sticky="nw")
-            self.txt_chat.window_create(END, self.play_video_button)
+            self.txt_chat.window_create(END, window=Button(self.window, text="Play Video", padx = 40, command=self.playVideo))
+            self.txt_chat.insert(END, '\n')
         
 
 
