@@ -62,49 +62,54 @@ class Chat:
         self.clean_button.grid(column = 2, row = 2)
         self.upload_button.grid(column = 2, row = 3)
     
+    def playSong(self):
+        pygame.mixer.music.load(self.window.filename)
+        pygame.mixer.music.play(loops=0)
+
+    def playVideo(self):
+        print(self.window.filename)
+        video = VideoFileClip(self.window.filename)
+        video.preview()
+        pygame.quit() 
+    
     def upload(self):
         global imagem
         global play_button
         global play_video_button
 
-        self.window.filename = filedialog.askopenfilename(filetypes= (("png files",".png"), 
-                                                        ("jpg files", ".jpg"), ("svg files", ".svg"), 
-                                                        ("bmp files", ".bmp"), ("mp3 files", ".mp3"), 
-                                                        ("mp4 files", ".mp4"), ("wav files", ".wav"), 
-                                                        ("mkv files", ".mkv"), ("gif files", "*.gif")))
-
+        self.window.filename = filedialog.askopenfilename(filetypes= (("png file",".png"), ("jpg file", ".jpg"),
+                                                        ("svg file", ".svg"), ("bmp file", ".bmp"),
+                                                        ("mp3 file", ".mp3"), ("mp4 file", ".mp4"),
+                                                        ("wav file", ".wav"), ("mkv file", ".mkv"), 
+                                                        ("gif file", "*.gif")))
         print(self.window.filename)
-        #Separando o nome do arquivo em relação ao '.' e pegar o último elemento que é o tipo do arquivo
         nome_arquivo = self.window.filename.split('.')
         tipo_arquivo = nome_arquivo[len(nome_arquivo) - 1]
 
         #Pritando mensagem de arquivo enviado
-        if(self.window.filename != ""):
-            self.txt_chat.configure(state=NORMAL)
+        self.txt_chat.configure(state=NORMAL)
+        current_time = "<" + datetime.now().strftime('%d/%m/%Y %H:%M') + "h" + "> "
+        self.txt_chat.insert(END, current_time + self.name + ": " + '\n')
+        self.show_archive(tipo_arquivo)
 
-            #Mensagem com data, hora e nome de quem enviou
-            current_time = "<" + datetime.now().strftime('%d/%m/%Y %H:%M') + "h" + "> "
-            self.txt_chat.insert(END, current_time + self.name + ": " + '\n')
+        self.txt_chat.configure(state=DISABLED)
+     
+        self.socket_udp.sendto(tipo_arquivo.encode('utf-8'), self.addr)
 
-            #Colocando arquivo na tela
-            self.show_archive(tipo_arquivo)
+        #Enviando arquivos para o outro cliente
+        with open(self.window.filename, 'rb') as file:
+            data = file.read(1024)
+            while data:
+                self.socket_udp.sendto(data, self.addr)
+                data = file.read(1024)    
 
-            self.txt_chat.configure(state=DISABLED)
-
-            #Enviando tipo de arquivo para o outro cliente
-            self.socket_udp.sendto(tipo_arquivo.encode('utf-8'), self.addr)
-
-            #Lendo o arquivo e enviando bytes do arquivo para o outro cliente
-            with open(self.window.filename, 'rb') as file:
-                for data in file.readlines():
-                    self.socket_udp.sendto(data, self.addr)
-            
-            #Confirmandoo que o arquivo foi enviado 
-            self.socket_udp.sendto("Envio Terminado".encode('utf-8'), self.addr)
+        time.sleep(0.03)
+        self.socket_udp.sendto("Envio Terminado".encode('utf-8'), self.addr)
 
     def show_archive(self, tipo_arquivo):
         #Caso o anexo seja uma imagem
-        if(tipo_arquivo in ['jpg', 'png', 'svg', 'bmp']):
+        if(tipo_arquivo in ['jpg', 'jpeg', 'png', 'svg', 'bmp']):
+            print("passei aqui")
 
             #Reduzindo o tamanho da imagem, caso necessario
             size = (self.txt_chat.winfo_width(), self.txt_chat.winfo_width())
@@ -119,30 +124,20 @@ class Chat:
             self.txt_chat.insert(END, '\n')
             self.listImages.append(imagem)
         
-        #Caso o anexo seja um audio
         elif (tipo_arquivo in ['mp3', 'wav']):
             pygame.mixer.init()               
                     
             self.txt_chat.window_create(END, window=Button(self.window, text="Play Song", padx = 40, command=self.playSong))
             self.txt_chat.insert(END, '\n')
 
-        #Caso o anexo seja um video
         elif (tipo_arquivo in ['mp4', 'mkv', 'gif']):
+            
             pygame.init()
 
             self.txt_chat.window_create(END, window=Button(self.window, text="Play Video", padx = 40, command=self.playVideo))
             self.txt_chat.insert(END, '\n')
-    
-    def playSong(self):
-        #Colocando música no player e tocando o player sem loop
-        pygame.mixer.music.load(self.window.filename)
-        pygame.mixer.music.play(loops=0)
-
-    def playVideo(self):
-        #Colocando video no player e colocando para passar automaticamente e encerrar logo após
-        video = VideoFileClip(self.window.filename)
-        video.preview()
-        pygame.quit() 
+            print(tipo_arquivo)
+        
 
     def clean(self):
         #Limpando tela de mensagens
@@ -213,13 +208,13 @@ class Chat:
     
     def get_message_udp(self):
         #Recenbendo o tipo de anexo e criando ele
-        archive_type = self.socket_udp.recvfrom(65536)
+        archive_type = self.socket_udp.recvfrom(1024)
         archive_name = f"ZapZap2 - {self.name_p2p} {self.receive_n}.{archive_type[0].decode('utf-8')}"
 
-        #Loop para receber e escrever o anexo, para quando recebe o aviso que o envio foi enviado completamente
+        #Loop para receber e escrever o anexo
         with open(archive_name, 'wb') as file:
             while True:
-                msg_received = self.socket_udp.recvfrom(65536)
+                msg_received = self.socket_udp.recvfrom(1024)
                 
                 if msg_received[0] == bytes("Envio Terminado", 'utf-8'):
                     break
@@ -264,7 +259,7 @@ class Login:
         #Labels de nome e porta
         self.label1 = Label(self.canva, text="Nome: ", anchor = W)
         self.label2 = Label(self.canva, text="Porta TCP: ", anchor = W)
-        #self.label3 = Label(self.canva, text="IP: ", anchor = W)
+        #self.label4 = Label(self.canva, text="IP: ", anchor = W)
 
         #Declarando as áreas de Texto
         self.txt_name = Entry(self.canva, width = 85, border = 1, bg = 'white')
@@ -279,7 +274,7 @@ class Login:
         #Posicionando os Widgets
         self.label1.grid(column = 0, row = 1, columnspan = 1)
         self.label2.grid(column = 0, row = 5, columnspan = 1)
-        #self.label3.grid(column = 0, row = 7, columnspan = 1)
+        #self.label4.grid(column = 0, row = 7, columnspan = 1)
         self.txt_name.grid(column = 1 , row = 1, columnspan = 3)
         self.txt_port_tcp.grid(column = 1, row = 5, columnspan = 3)
         #self.txt_ip.grid(column = 1, row = 7, columnspan = 3)

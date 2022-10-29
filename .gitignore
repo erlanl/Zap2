@@ -1,1 +1,10 @@
 __pycache__
+*.png
+*.jpg
+*.svg
+*.bmp
+*.mp3
+*.mp4
+*.wav
+*.mkv
+*.gif
