@@ -21,6 +21,8 @@ class Chat:
         self.server_port_tcp = 50000
         self.server_port_udp = ('localhost', 50001)
         self.receive_n = 0
+        self.ackseq =-1
+        self.req = 0
 
         #Declarando as informações da janela
         self.window = Tk()
@@ -215,11 +217,34 @@ class Chat:
         with open(archive_name, 'wb') as file:
             while True:
                 msg_received = self.socket_udp.recvfrom(1024)
-                
-                if msg_received[0] == bytes("Envio Terminado", 'utf-8'):
-                    break
-                else:
+
+                if msg_received[0] != bytes("Envio Terminado", 'utf-8'):
                     file.write(msg_received[0])
+                    self.ackseq=-1
+                    self.req=0
+                    messg=''
+                    continue
+                else:
+                    break
+
+                message=message.split('/r')
+                checksumm = []
+                checksumm.append(list(self.calculate_checksum(message[0].split())))
+                checksumm.append(list(message[1]))
+                sum = self.summ(checksumm)
+                if ('0' not in sum) and (req==int(message[2])):
+                    if self.req==0:
+                        self.req=1
+                        self.ackseq=0
+                    else :
+                        self.req=0
+                        self.ackseq=1
+                    messg+=message[0]
+                    modifiedMessage = 'AK'+'/r'+'1011111010110100'+'/r'+message[2]
+                    self.socket_udp.sendto(modifiedMessage.encode('utf-8'), self.addr)
+                elif ('0' in sum) or (req!=int(message[2])):
+                    modifiedMessage = 'AK'+'/r'+'1011111010110100'+'/r'+str(ackseq)
+                    self.socket_udp.sendto(modifiedMessage.encode('utf-8'), self.addr)
             
             file.close()
 
@@ -240,6 +265,149 @@ class Chat:
 
     def start(self):
         self.window.mainloop()
+
+    ##Implemation RDT3.0
+
+    def binary_sum(self, f):  # To find sum of 16 bit words of a packet
+        carry=0
+        ss=[]
+        for i in range(0,16,1):
+            s=int(f[0][i])+int(f[1][i])+carry
+            if s==0:
+                ss.append('0')
+            elif s==1:
+                ss.append('1')
+                if carry==1:
+                    carry=0
+            elif s==2:
+                ss.append('0')
+                carry=1
+            elif s==3:
+                ss.append('1')
+                carry=1
+        while(carry!=0):
+            for i in range(0,16,1):
+                s=int(ss[i])+carry
+                if s==int(ss[i]):
+                    break
+                if s==1:
+                    ss[i]='1'
+                    if carry==1:
+                        carry=0
+                if s==2:
+                    ss[i]='0'
+                    carry=1
+        return ss
+
+    def packet_division(data, packet_size):  #Divide message into packets
+        try:
+            packets=[]
+            reminder=int(len(data) % packet_size)
+            number_of_packets=int(len(data)/packet_size)
+            for i in range(number_of_packets):
+                packets.append(list(data[(i*packet_size):(packet_size+(packet_size*i))]))
+            rem = list(data[(number_of_packets*packet_size):(reminder+(packet_size*number_of_packets))])
+            for i in range((5-len(rem))):
+                rem.append(' ')
+            packets.append(rem)
+            return packets
+        except Exception as e:
+            print("Cant create packets")
+            return []
+
+    def firstcom(s):  #Find first complement
+        for i in range(len(s)):
+            if s[i]=='0':
+                s[i]='1'
+            elif s[i]=='1':
+                s[i]='0'
+        return s
+
+    def calculate_checksum(self, f):   # Main function to find checksum of a packet
+        sum=[['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0']]
+        count=0
+        for  i in f:
+            if len(i)==2:
+                sum.append(self.Convert_to_bits(i))
+                count+=1
+        if count==2:
+            s=list(sum[1:3])
+            s = self.summ(s)
+            s = self.firstcom(s)
+            s=''.join(s)
+            return(s)
+        elif count==1:
+            return(''.join(self.firstcom(sum[1])))
+        else:
+            return(''.join(self.firstcom(sum[0])))
+
+
+    def packets_checksum(self, packets):  #start of checksum calculation
+        try:
+            s=[]
+            Convert_to_bits=[]
+            for i in range(len(packets)):
+                    f=''.join(packets[i])
+                    s.append(f.split())
+                    Convert_to_bits.append(self.calculate_checksum(f.split()))
+            return(Convert_to_bits)
+        except Exception as e:
+            print('cant do it')
+
+    def create_packet(packet,Convert_to_bits,seq):
+        f = ''.join(packet)+'/r'+Convert_to_bits+'/r'+str(seq)
+        return(f)
+
+    def rdt_send(self, data):
+        packet_size=5
+        packetss = self.packet_division(data,packet_size)
+        print("Number of packets made",int(len(packetss)))
+        Convert_to_bits=self.packets_checksum(packetss)
+        sequence_number=0
+        for i in range(len(packetss)):
+            count=1
+            timeoutflag=0
+            message = self.create_packet(packetss[i],Convert_to_bits[i],sequence_number)
+            print("Sending packet",i,"with checksum",str(Convert_to_bits[i]),"and sequence number",sequence_number)
+            if sequence_number==1:
+                sequence_number=0
+            else:
+                sequence_number=1
+            self.socket_udp.sendto(message.encode(),self.addr)
+            while True:
+                try:
+                    modifiedMessage, serverAddress = self.socket_udp.recvfrom(2048)
+                    break
+                except Exception as aa:
+                    count+=1
+                    if count==100000:
+                        print("Timeout")
+                        timeoutflag=1
+                        break
+            if timeoutflag==1:
+                i-=1
+                if sequence_number==1:
+                    sequence_number=0
+                else:
+                    sequence_number=1
+                continue
+            modifiedMessage=modifiedMessage.decode()
+            modifiedMessage= modifiedMessage.split('/r')
+            s=[]
+            s.append(list(str(modifiedMessage[1])))
+            s.append(list('0100000101001011'))
+            ff = self.summ(s)
+            if ('0'  in ff) or (sequence_number==int(modifiedMessage[2])):
+                i-=1
+                if sequence_number==1:
+                    sequence_number=0
+                else:
+                    sequence_number=1
+            else:
+                print("Acknowledgement of packet with sequence number",modifiedMessage[2],"received")
+        message="/r/r"
+        self.socket_udp.sendto(message.encode(),self.addr)
+        return
 
 class Login:
 
@@ -346,94 +514,3 @@ class Server:
         #Fecha a conexão do server
         self.server_tcp.close()
         self.server_udp.close()
-
-
-'''class UDP:
-
-    def __int__(self):
-        self.port = 50000
-        self.sock_udt = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.serverAddressPort = ('localhost', self.port)
-        self.contador = 0
-    
-    def emissor_rdt(self, data):
-        #Preparando o pacote
-        self.make_pkt_emissor(self.contador, data)
-        #Enviando o pacote
-        self.sock_udt.sendto(self.pkt_emissor, self.serverAddressPort)
-
-        #Mudando o número de sequência
-        if (self.contador == 0):
-            self.contador = 1
-        else:
-            self.contador = 0
-        
-        #Recebendo pacote
-        msgFromReceptor = self.sock_udt.recvfrom(1024).split(',')
-
-        #Se o pacote não tiver o ack com o número de sequência antes da alteração ou estiver corrompido, chegou errado
-        if (msgFromReceptor[1] == 'ACK' and (msgFromReceptor.split()[0] == '{self.contador}' or self.corrupt(msgFromReceptor))):
-            #tempo tem que ficar passando
-            pass
-
-            #se deu timeout, reenvia o pacote
-            if (timeout):
-                self.sock_udt.sendto(self.pkt_emissor, self.serverAddressPort)
-                #reinicia o contador
-                self.start_time()
-
-        #Se o pacote tiver o ack desejado e não estiver corrompido, para o timer
-        elif (msgFromReceptor.split()[1] == 'ACK' and (msgFromReceptor.split()[0] != '{self.contador}' or ~self.corrupt(msgFromReceptor))):
-            self.stop_time()
-
-    
-    def receptor_rdt(self):
-        msgFromEmissor = self.sock_udt.recvfrom(1024).split(',')
-
-        #chegou corretamente
-        if (~self.corrupt(msgFromEmissor) and msgFromEmissor[0] != self.contador):
-            data = msgFromEmissor[1]
-
-            if (self.contador == 0):
-                self.make_pkt_receptor(0, 'ACK')
-            else:
-                self.make_pkt_receptor(1, 'ACK')
-
-            #compute checksum
-
-            self.sock_udt.sendto(self.pkt_receptor, self.serverAddressPort)
-    
-
-    def checksum(self, byte_msg):
-        total = 0
-        length = len(byte_msg)  # length of the byte message object
-        i = 0
-
-        while length > 1:
-            total += ((byte_msg[i + 1] << 8) & 0xFF00) + ((byte_msg[i]) & 0xFF)
-            i += 2
-            length -= 2
-
-        if length > 0:
-            total += (byte_msg[i] & 0xFF)
-
-        while (total >> 16) > 0:
-            total = (total & 0xFFFF) + (total >> 16)
-
-        total = ~total
-
-        return total & 0xFFFF
-    
-    def make_pkt_emissor(self, contador, data):
-        self.pkt_emissor = {contador + ',' + data + ',' + self.checksum(bytes(data))}
-        self.start_time()
-    
-    def make_pkt_receptor(self, contador, data):
-        self.pkt_receptor = {contador + ',' + data + ',' + self.checksum(bytes(data))}
-    
-    def start_time(self):
-        pass
-
-    def corrupt(self, pkt):
-        checksum_analise = self.checksum(bytes(pkt[1]))
-        return checksum_analise != pkt[2]'''
