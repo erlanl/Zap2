@@ -203,21 +203,29 @@ class Chat:
         archive_type = self.socket_udp.recvfrom(65536)
         archive_name = f"ZapZap2 - {self.name_p2p} {self.receive_n}.{archive_type[0].decode('utf-8')}"
 
-        with open(archive_name, 'wb+') as file:
+        with open(archive_name, 'wb') as file:
             while True:
                 msg_received = self.socket_udp.recvfrom(65536)
-                try:
-                    if msg_received[0].decode('utf-8') == "Envio Terminado":
-                        break
-                except:
+                
+                if msg_received[0] == bytes("Envio Terminado", 'utf-8'):
+                    break
+                else:
                     file.write(msg_received[0])
                     
             file.close()
 
         self.window.filename = archive_name
         self.receive_n += 1
+        
+        #Pritando mensagem de arquivo enviado
+        self.txt_chat.configure(state=NORMAL)
+        current_time = "<" + datetime.now().strftime('%d/%m/%Y %H:%M') + "h" + "> "
+        self.txt_chat.insert(END, current_time + self.name_p2p + ": " + '\n')
+
         self.show_archive(archive_type[0].decode('utf-8'))
     
+        self.txt_chat.configure(state=DISABLED)
+
     def start(self):
         self.window.mainloop()
 
