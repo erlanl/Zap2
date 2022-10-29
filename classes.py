@@ -104,16 +104,19 @@ class Chat:
         self.socket_udp.sendto("Envio Terminado".encode('utf-8'), self.addr)
 
     def show_archive(self, tipo_arquivo):
-
+        #Caso o anexo seja uma imagem
         if(tipo_arquivo in ['jpg', 'jpeg', 'png', 'svg', 'bmp']):
             print("passei aqui")
+
+            #Reduzindo o tamanho da imagem, caso necessario
             size = (self.txt_chat.winfo_width(), self.txt_chat.winfo_width())
             imagem = Image.open(self.window.filename)
             if(imagem.width > size[0]//2 or imagem.height > size[1]//2):
                 nu = (imagem.width//(size[0]//2) if imagem.width//(size[0]//2) > imagem.height//(size[1]//2) else imagem.height//(size[1]//2))
                 imagem = imagem.resize((imagem.width//nu,imagem.height//nu))
+            
+            #Printando a imagem na tela
             imagem = ImageTk.PhotoImage(imagem)
-
             self.txt_chat.image_create(END, image=imagem)
             self.txt_chat.insert(END, '\n')
             self.listImages.append(imagem)
@@ -200,9 +203,11 @@ class Chat:
                 pass
     
     def get_message_udp(self):
+        #Recenbendo o tipo de anexo e criando ele
         archive_type = self.socket_udp.recvfrom(65536)
         archive_name = f"ZapZap2 - {self.name_p2p} {self.receive_n}.{archive_type[0].decode('utf-8')}"
 
+        #Loop para receber e escrever o anexo
         with open(archive_name, 'wb') as file:
             while True:
                 msg_received = self.socket_udp.recvfrom(65536)
@@ -211,13 +216,13 @@ class Chat:
                     break
                 else:
                     file.write(msg_received[0])
-                    
+            
             file.close()
 
         self.window.filename = archive_name
         self.receive_n += 1
         
-        #Pritando mensagem de arquivo enviado
+        #Pritando o anexo e a mensagem de anexo enviado
         self.txt_chat.configure(state=NORMAL)
         current_time = "<" + datetime.now().strftime('%d/%m/%Y %H:%M') + "h" + "> "
         self.txt_chat.insert(END, current_time + self.name_p2p + ": " + '\n')
@@ -225,6 +230,9 @@ class Chat:
         self.show_archive(archive_type[0].decode('utf-8'))
     
         self.txt_chat.configure(state=DISABLED)
+
+        #Chamando a funcao para poder pegar o proximo anexo
+        self.get_message_udp()
 
     def start(self):
         self.window.mainloop()
