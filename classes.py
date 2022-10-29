@@ -20,6 +20,7 @@ class Chat:
         self.name, self.port_tcp = Login(1024, 768).start()
         self.server_port_tcp = 50000
         self.server_port_udp = ('localhost', 50001)
+        self.receive_n = 0
 
         #Declarando as informações da janela
         self.window = Tk()
@@ -75,20 +76,37 @@ class Chat:
         global play_button
         global play_video_button
 
-        #ENVIA UMA MENSAGEM UDP AO CLICAR EM UPLOAD
-        #self.addr -> ENDEREÇO UDP DO OUTRO CLIENTE
-        try:
-            self.socket_udp.sendto("Teste".encode('utf-8'), self.addr)
-        except:
-            pass
-
-        self.window.file = filedialog.askopenfile()
-        self.window.filename = self.window.file.name
+        self.window.filename = filedialog.askopenfilename(filetypes= (("png file",".png"), ("jpg file", ".jpg"),
+                                                        ("svg file", ".svg"), ("bmp file", ".bmp"),
+                                                        ("mp3 file", ".mp3"), ("mp4 file", ".mp4"),
+                                                        ("wav file", ".wav"), ("mkv file", ".mkv"), 
+                                                        ("gif file", "*.gif")))
+        print(self.window.filename)
         nome_arquivo = self.window.filename.split('.')
         tipo_arquivo = nome_arquivo[len(nome_arquivo) - 1]
 
+        #Pritando mensagem de arquivo enviado
         self.txt_chat.configure(state=NORMAL)
+        current_time = "<" + datetime.now().strftime('%d/%m/%Y %H:%M') + "h" + "> "
+        self.txt_chat.insert(END, current_time + self.name + ": " + '\n')
+        self.show_archive(tipo_arquivo)
+
+        self.txt_chat.configure(state=DISABLED)
+     
+        self.socket_udp.sendto(tipo_arquivo.encode('utf-8'), self.addr)
+
+        #Enviando arquivos para o outro cliente
+        with open(self.window.filename, 'rb') as file:
+            for data in file.readlines():
+                self.socket_udp.sendto(data, self.addr)
+
+        time.sleep(0.03)
+        self.socket_udp.sendto("Envio Terminado".encode('utf-8'), self.addr)
+
+    def show_archive(self, tipo_arquivo):
+
         if(tipo_arquivo in ['jpg', 'jpeg', 'png', 'svg', 'bmp']):
+            print("passei aqui")
             size = (self.txt_chat.winfo_width(), self.txt_chat.winfo_width())
             imagem = Image.open(self.window.filename)
             if(imagem.width > size[0]//2 or imagem.height > size[1]//2):
@@ -107,11 +125,12 @@ class Chat:
             self.txt_chat.insert(END, '\n')
 
         elif (tipo_arquivo in ['mp4', 'mkv', 'gif']):
+            
             pygame.init()
 
             self.txt_chat.window_create(END, window=Button(self.window, text="Play Video", padx = 40, command=self.playVideo))
             self.txt_chat.insert(END, '\n')
-        self.txt_chat.configure(state=DISABLED)
+        
 
     def clean(self):
         #Limpando tela de mensagens
@@ -181,22 +200,23 @@ class Chat:
                 pass
     
     def get_message_udp(self):
-        while True:
-            msg_received = self.socket_udp.recvfrom(1024)
-            try:
-                #Recebendo mensagem
-                self.msg_received_udp = msg_received[0].decode('utf-8')
-                print(self.msg_received_udp)
-                #print(self.name_p2p + ": " + self.msg_received)
-                self.receive_msg_udp = self.name_p2p + ": " + self.msg_received_udp
-                print(self.receive_msg_udp)
-            except:
-                pass
-    
-    def receive_udp(self, arquivo):
-        self.text_received_udp = arquivo
-        #self.txt_chat.insert(END, current_time + self.text_received)
+        archive_type = self.socket_udp.recvfrom(65536)
+        archive_name = f"ZapZap2 - {self.name_p2p} {self.receive_n}.{archive_type[0].decode('utf-8')}"
 
+        with open(archive_name, 'wb+') as file:
+            while True:
+                msg_received = self.socket_udp.recvfrom(65536)
+                try:
+                    if msg_received[0].decode('utf-8') == "Envio Terminado":
+                        break
+                except:
+                    file.write(msg_received[0])
+                    
+            file.close()
+
+        self.window.filename = archive_name
+        self.receive_n += 1
+        self.show_archive(archive_type[0].decode('utf-8'))
     
     def start(self):
         self.window.mainloop()
