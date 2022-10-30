@@ -27,8 +27,11 @@ class Chat:
 
         #Declarando as informações da janela
         self.window = Tk()
+
         self.window.title(f"Chat P2P de {self.name}")
         self.canva = Canvas(self.window, width = largura, height = altura)
+        self.canva.configure(background='#252331')
+
         self.canva.grid(columnspan = 3)
         self.listImages = []
         self.createWidgets()
@@ -50,17 +53,18 @@ class Chat:
         #Declarando os widgets do chat
         self.txt_chat = ScrolledText(self.canva, border = 1, state=DISABLED)
         self.txt_chat.pack()
-        self.txt_field = Entry(self.canva, width = 90, border = 1, bg = 'white')
-        self.send_button = Button(self.canva, text = "Enviar", padx = 39, command = self.send)
-        self.clean_button = Button(self.canva, text = "Limpar", padx = 38, command = self.clean)
-        self.upload_button = Button(self.canva, text = "Arquivo", padx = 35, command = self.upload)
+        self.txt_field = Entry(self.canva, width = 92, border = 1, bg = '#252331')
+        self.send_button = Button(self.canva, text = "Enviar", width=14, command = self.send, background="#494758", foreground='white')
+        self.clean_button = Button(self.canva, text = "Limpar", width=14, command = self.clean, background="#494758", foreground='white')
+        self.upload_button = Button(self.canva, text = "Arquivo", width=14, command = self.upload, background="#494758", foreground='white')
         self.window.bind('<Return>', self.send)
         
         
         #Posicionando os Widgets
-        self.txt_chat.config(background = "#363636", foreground='white')
+        self.txt_chat.config(background = "#252331", foreground='white')
         self.txt_chat.grid(column = 0, row = 0, columnspan = 3)
-        self.txt_field.grid(column = 0, row = 2, columnspan = 2)
+        self.txt_field.config(background = "#1e1d26", foreground='white')
+        self.txt_field.grid(column = 0, row = 2)
         self.send_button.grid(column = 2, row = 1)
         self.clean_button.grid(column = 2, row = 2)
         self.upload_button.grid(column = 2, row = 3)
@@ -68,6 +72,9 @@ class Chat:
     def playSong(self):
         pygame.mixer.music.load(self.window.filename)
         pygame.mixer.music.play(loops=0)
+
+    def stopSong(self):
+        pygame.mixer.music.stop()
 
     def playVideo(self):
         print(self.window.filename)
@@ -121,7 +128,7 @@ class Chat:
 
     def show_archive(self, tipo_arquivo):
         #Caso o anexo seja uma imagem
-        if(tipo_arquivo in ['jpg', 'jpeg', 'png', 'svg', 'bmp']):
+        if(tipo_arquivo in ['jpg', 'png', 'svg', 'bmp']):
 
             #Reduzindo o tamanho da imagem, caso necessario
             size = (self.txt_chat.winfo_width(), self.txt_chat.winfo_width())
@@ -140,6 +147,7 @@ class Chat:
             pygame.mixer.init()               
                     
             self.txt_chat.window_create(END, window=Button(self.window, text="Play Song", padx = 40, command=self.playSong))
+            self.txt_chat.window_create(END, window=Button(self.window, text="Stop Song", padx = 40, command=self.stopSong))
             self.txt_chat.insert(END, '\n')
 
         elif (tipo_arquivo in ['mp4', 'mkv', 'gif']):
@@ -270,6 +278,7 @@ class Login:
         self.window = Tk()
         self.window.title("Zap 2")
         self.canva = Canvas(self.window, width = largura, height = altura)
+        self.canva.configure(background='#1e1d26')
         self.canva.grid(columnspan = 3)
         self.createWidgets()
 
@@ -279,29 +288,29 @@ class Login:
     def createWidgets(self):
 
         #Labels de nome e porta
-        self.label1 = Label(self.canva, text="Nome: ", anchor = W)
-        self.label2 = Label(self.canva, text="Porta TCP: ", anchor = W)
-        #self.label4 = Label(self.canva, text="IP: ", anchor = W)
+        self.label1 = Label(self.canva, text="Nome: ", anchor = W, width = 8, background="#1e1d26", foreground='white')
+        self.label2 = Label(self.canva, text="Porta TCP: ", anchor = W, width = 8, background="#1e1d26", foreground='white')
+        self.label3 = Label(self.canva, text="IP: ", anchor = W, width = 8, background="#1e1d26", foreground='white')
 
         #Declarando as áreas de Texto
-        self.txt_name = Entry(self.canva, width = 85, border = 1, bg = 'white')
-        self.txt_port_tcp = Entry(self.canva, width = 85, border = 1, bg = 'white')
-        self.txt_port_udp = Entry(self.canva, width = 85, border = 1, bg = 'white')
-        #self.txt_ip = Entry(self.canva, width = 85, border = 1, bg = 'white')   
+        self.txt_name = Entry(self.canva, width = 75, border = 1, bg = '#252331', foreground='white')
+        self.txt_port_tcp = Entry(self.canva, width = 75, border = 1, bg = '#252331', foreground='white')
+        self.txt_port_udp = Entry(self.canva, width = 75, border = 1, bg = '#252331', foreground='white')
+        self.txt_ip = Entry(self.canva, width = 75, border = 1, bg = '#252331', foreground='white')   
    
         #Declarando o Botão
-        self.send_button = Button(self.canva, text = "Enviar", padx = 40, command = self.send)  
+        self.send_button = Button(self.canva, text = "Enviar", width=10, command = self.send, background="#494758", foreground='white')  
         self.window.bind('<Return>', self.send)      
         
         #Posicionando os Widgets
         self.label1.grid(column = 0, row = 1, columnspan = 1)
         self.label2.grid(column = 0, row = 5, columnspan = 1)
-        #self.label4.grid(column = 0, row = 7, columnspan = 1)
+        self.label3.grid(column = 0, row = 6, columnspan = 1)
         self.txt_name.grid(column = 1 , row = 1, columnspan = 3)
         self.txt_port_tcp.grid(column = 1, row = 5, columnspan = 3)
-        #self.txt_ip.grid(column = 1, row = 7, columnspan = 3)
+        self.txt_ip.grid(column = 1, row = 6, columnspan = 3)
 
-        self.send_button.grid(column = 5, row = 1)
+        self.send_button.grid(column = 5, row = 5)
 
     def send(self, event = None):
         #Pegando as infromações de nome e porta e fechando a janela
@@ -312,67 +321,3 @@ class Login:
     def start(self):
         self.window.mainloop()
         return self.text_nome, self.text_porta_tcp
-
-class Server:
-
-    def __init__(self):
-        #Porta do server
-        self.port_tcp = 50000
-        self.port_udp = 50001
-
-        #Criando socket TCP do server
-        self.server_tcp = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
-        self.server_tcp.bind(('localhost', self.port_tcp))
-
-        #Criando socket UDP do server
-        self.server_udp = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
-        self.server_udp.bind(('localhost', self.port_udp))
-
-        #Inicia o server
-        self.start()
-
-    #Aceita a conexão do cliente e recebe seus dados
-    def accept_client(self):
-        client, addr = self.server_tcp.accept()
-        name = client.recv(1024).decode('utf-8')
-        print("Nome: " + name)
-
-        addr_pair_msg = self.server_udp.recvfrom(1024)
-        print("Addr envio mensagens: " + str(addr_pair_msg[1]))
-        command = addr_pair_msg[0].decode('utf-8')
-        address_msg = addr_pair_msg[1]
-
-        addr_pair_acks = self.server_udp.recvfrom(1024)
-        print("Addr envio acks: " + str(addr_pair_acks[1]) + "\n")
-        command = addr_pair_acks[0].decode('utf-8')
-        address_acks = addr_pair_acks[1]
-
-        client_list = [client, addr[0], addr[1], name, address_msg[1], address_acks[1]]
-
-        return client_list
-
-    #Envia os dados de um cliente ao outro
-    def send_data(self, client_sender, client_reciever):
-        client_reciever[0].sendall(client_sender[3].encode('utf-8'))
-        time.sleep(0.03)
-        client_reciever[0].sendall(client_sender[1].encode('utf-8'))
-        time.sleep(0.03)
-        client_reciever[0].sendall(str(client_sender[2]).encode('utf-8'))
-        time.sleep(0.03)
-        client_reciever[0].sendall(str(client_sender[4]).encode('utf-8'))
-        time.sleep(0.03)
-        client_reciever[0].sendall(str(client_sender[5]).encode('utf-8'))
-        print("Troca Concluída")
-
-    def start(self):
-        self.server_tcp.listen(2)
-        self.client1 = self.accept_client()
-        self.client2 = self.accept_client()
-
-        #Troca os dados entre os clientes
-        self.send_data(self.client1, self.client2)
-        self.send_data(self.client2, self.client1)
-
-        #Fecha a conexão do server
-        self.server_tcp.close()
-        self.server_udp.close()
