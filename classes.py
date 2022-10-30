@@ -118,11 +118,8 @@ class Chat:
             with open(self.window.filename, 'rb') as file:
                 for data in file.readlines():
                     rdt.rdt_send(self.socket_udp_msg, self.addr_msg, data)
-                    #time.sleep(0.03)
-                    #self.socket_udp_msg.sendto(data, self.addr_msg)
 
             #Confirmandoo que o arquivo foi enviado 
-            #self.socket_udp_msg.sendto("Envio Terminado".encode('utf-8'), self.addr_msg)
             rdt.rdt_send(self.socket_udp_msg, self.addr_msg, "Envio Terminado".encode('utf-8'))
 
 
@@ -131,11 +128,13 @@ class Chat:
         if(tipo_arquivo in ['jpg', 'png', 'svg', 'bmp']):
 
             #Reduzindo o tamanho da imagem, caso necessario
-            size = (self.txt_chat.winfo_width(), self.txt_chat.winfo_width())
-            imagem = Image.open(self.window.filename)
+            size = (self.txt_chat.winfo_width(), self.txt_chat.winfo_width()) #Guardando a altura e largura da tela do chat
+            imagem = Image.open(self.window.filename) #Abrindo a imagem
+            #Caso a largura ou altura seja maior do que metade da tela
             if(imagem.width > size[0]//2 or imagem.height > size[1]//2):
+                #Armazenando o quanto a largura ou altura eh maior do que a tela
                 nu = (imagem.width//(size[0]//2) if imagem.width//(size[0]//2) > imagem.height//(size[1]//2) else imagem.height//(size[1]//2))
-                imagem = imagem.resize((imagem.width//nu,imagem.height//nu))
+                imagem = imagem.resize((imagem.width//nu,imagem.height//nu)) #Usando resize para diminuir a imagem na proporcao certa
             
             #Printando a imagem na tela
             imagem = ImageTk.PhotoImage(imagem)
@@ -231,7 +230,6 @@ class Chat:
             try:
                 #Recebendo mensagem
                 self.msg_received = self.client_p2p.recv(1024).decode('utf-8')
-                #print(self.name_p2p + ": " + self.msg_received)
                 self.receive(self.name_p2p + ": " + self.msg_received)
             except:
                 pass
