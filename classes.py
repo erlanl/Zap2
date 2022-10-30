@@ -12,17 +12,22 @@ from turtle import up
 from PIL import Image, ImageTk
 import pygame
 from moviepy.editor import *
+import signal
+
+PAYLOAD_LIMIT = 10000
+TIMEOUT = 5
+ACK = 0
+DATA = 1
 
 class Chat:
 
     def __init__(self, largura, altura):
+    
         #Informações do usuário
         self.name, self.port_tcp = Login(1024, 768).start()
         self.server_port_tcp = 50000
         self.server_port_udp = ('localhost', 50001)
         self.receive_n = 0
-        self.ackseq =-1
-        self.req = 0
 
         #Declarando as informações da janela
         self.window = Tk()
@@ -44,6 +49,12 @@ class Chat:
         #Thread UDP
         thread_get_message_udp = threading.Thread(target=self.get_message_udp, args=(), daemon=True)
         thread_get_message_udp.start()
+
+        #Variaveis globais
+        self.__send_seq = 0
+        self.__recv_seq = 0
+        self.__buffer = []
+        self.__last_ACK_seq = None
 
     def createWidgets(self):
         #Declarando os widgets do chat
@@ -69,7 +80,6 @@ class Chat:
         pygame.mixer.music.play(loops=0)
 
     def playVideo(self):
-        print(self.window.filename)
         video = VideoFileClip(self.window.filename)
         video.preview()
         pygame.quit() 
@@ -92,6 +102,7 @@ class Chat:
         self.txt_chat.configure(state=NORMAL)
         current_time = "<" + datetime.now().strftime('%d/%m/%Y %H:%M') + "h" + "> "
         self.txt_chat.insert(END, current_time + self.name + ": " + '\n')
+
         self.show_archive(tipo_arquivo)
 
         self.txt_chat.configure(state=DISABLED)
@@ -102,8 +113,9 @@ class Chat:
         with open(self.window.filename, 'rb') as file:
             data = file.read(1024)
             while data:
-                self.socket_udp.sendto(data, self.addr)
-                data = file.read(1024)    
+                self.rdt_send(data)
+                data = file.read(1024)  
+                self.__send_seq ^= 1
 
         time.sleep(0.03)
         self.socket_udp.sendto("Envio Terminado".encode('utf-8'), self.addr)
@@ -138,7 +150,6 @@ class Chat:
 
             self.txt_chat.window_create(END, window=Button(self.window, text="Play Video", padx = 40, command=self.playVideo))
             self.txt_chat.insert(END, '\n')
-            print(tipo_arquivo)
         
 
     def clean(self):
@@ -216,39 +227,18 @@ class Chat:
         #Loop para receber e escrever o anexo
         with open(archive_name, 'wb') as file:
             while True:
-                msg_received = self.socket_udp.recvfrom(1024)
+                msg_received = self.rdt_rcv()
 
-                if msg_received[0] != bytes("Envio Terminado", 'utf-8'):
-                    file.write(msg_received[0])
-                    self.ackseq=-1
-                    self.req=0
-                    messg=''
-                    continue
-                else:
+                if msg_received == bytes("Envio Terminado", 'utf-8'):
                     break
-
-                message=message.split('/r')
-                checksumm = []
-                checksumm.append(list(self.calculate_checksum(message[0].split())))
-                checksumm.append(list(message[1]))
-                sum = self.summ(checksumm)
-                if ('0' not in sum) and (req==int(message[2])):
-                    if self.req==0:
-                        self.req=1
-                        self.ackseq=0
-                    else :
-                        self.req=0
-                        self.ackseq=1
-                    messg+=message[0]
-                    modifiedMessage = 'AK'+'/r'+'1011111010110100'+'/r'+message[2]
-                    self.socket_udp.sendto(modifiedMessage.encode('utf-8'), self.addr)
-                elif ('0' in sum) or (req!=int(message[2])):
-                    modifiedMessage = 'AK'+'/r'+'1011111010110100'+'/r'+str(ackseq)
-                    self.socket_udp.sendto(modifiedMessage.encode('utf-8'), self.addr)
+                else:
+                    file.write(msg_received)
+                
+                self.__recv_seq ^= 1
             
             file.close()
 
-        self.window.filename = archive_name
+        #self.window.filename = archive_name
         self.receive_n += 1
         
         #Pritando o anexo e a mensagem de anexo enviado
@@ -256,158 +246,95 @@ class Chat:
         current_time = "<" + datetime.now().strftime('%d/%m/%Y %H:%M') + "h" + "> "
         self.txt_chat.insert(END, current_time + self.name_p2p + ": " + '\n')
 
-        self.show_archive(archive_type[0].decode('utf-8'))
+        #self.show_archive(archive_type[0].decode('utf-8'))
     
         self.txt_chat.configure(state=DISABLED)
 
         #Chamando a funcao para poder pegar o proximo anexo
         self.get_message_udp()
+    
+    def rdt_rcv(self):
+        rcvpkt, _ = self.socket_udp.recvfrom(65536)
+        rcvpkt = rcvpkt.decode('utf-8').split(' separacao ')
+
+        print('chegou no if')
+
+        if (~self.is_corrupted(rcvpkt) and self.is_in_sequence(rcvpkt)):
+            data = bytes(rcvpkt[1])
+            self.send_ack()
+            return data
+        else:
+            self.send_ack()
+
+
+    def send_ack(self):
+        pck = bytes("ACK", 'utf-8')
+        checksum = self.__get_checksum(pck)
+        sndack = (self.make_pkt(pck, checksum)).encode('utf-8')
+        self.socket_udp.sendto(sndack, self.addr)
+
+
+    def is_in_sequence(self, rcvpkt):
+        return int(rcvpkt[0]) == self.__recv_seq
+
+
+    def rdt_send(self, data):
+        checksum = self.__get_checksum(data)
+        #print('passou do check')
+        sndpkt = (self.make_pkt(data, checksum)).encode('utf-8')
+        self.socket_udp.sendto(sndpkt, self.addr)
+
+        #############ERROOOOOOOOOOOOOOORRRRRRR#############################
+        try:
+            self.socket_udp.settimeout(0.04)
+            rcvpkt, _ = self.socket_udp.recvfrom(65536)
+            rcvpkt = rcvpkt.split(' separacao ')
+
+            if (self.is_corrupted(rcvpkt) or ~self.isACKSeqNum(int(rcvpkt[0]))):
+                rcvpkt, _ = self.socket_udp.recvfrom(65536)
+                rcvpkt = rcvpkt.split(' separacao ')
+
+        except:
+            self.rdt_send(data)
+            
+
+    def make_pkt(self, data, checksum):
+        return f"{self.__send_seq} separacao {data} separacao {checksum}"
+    
+
+    def isACKSeqNum(self, seqNum):
+        return seqNum == self.__send_seq
+    
+
+    def is_corrupted(self, rcvpkt):
+        local_checksum = self.__get_checksum(bytes(rcvpkt[1], 'utf-8'))
+        checksum = int(rcvpkt[2])
+        return ~(local_checksum + checksum == 0xFFFF)
+    
+
+    def __get_checksum(self, data):
+        total = 0
+        length = len(data)
+
+        i = 0
+
+        while length > 1:
+            total += ((data[i+1] << 8) & 0xFF00) + ((data[i]) & 0xFF)
+            i += 2
+            length -= 2
+
+        if length > 0:
+            total += (data[i] & 0xFF)
+
+        while (total >> 16) > 0:
+            total = (total & 0xFFFF) + (total >> 16)
+
+        return total & 0xFFFF
+    
+
 
     def start(self):
         self.window.mainloop()
-
-    ##Implemation RDT3.0
-
-    def binary_sum(self, f):  # To find sum of 16 bit words of a packet
-        carry=0
-        ss=[]
-        for i in range(0,16,1):
-            s=int(f[0][i])+int(f[1][i])+carry
-            if s==0:
-                ss.append('0')
-            elif s==1:
-                ss.append('1')
-                if carry==1:
-                    carry=0
-            elif s==2:
-                ss.append('0')
-                carry=1
-            elif s==3:
-                ss.append('1')
-                carry=1
-        while(carry!=0):
-            for i in range(0,16,1):
-                s=int(ss[i])+carry
-                if s==int(ss[i]):
-                    break
-                if s==1:
-                    ss[i]='1'
-                    if carry==1:
-                        carry=0
-                if s==2:
-                    ss[i]='0'
-                    carry=1
-        return ss
-
-    def packet_division(data, packet_size):  #Divide message into packets
-        try:
-            packets=[]
-            reminder=int(len(data) % packet_size)
-            number_of_packets=int(len(data)/packet_size)
-            for i in range(number_of_packets):
-                packets.append(list(data[(i*packet_size):(packet_size+(packet_size*i))]))
-            rem = list(data[(number_of_packets*packet_size):(reminder+(packet_size*number_of_packets))])
-            for i in range((5-len(rem))):
-                rem.append(' ')
-            packets.append(rem)
-            return packets
-        except Exception as e:
-            print("Cant create packets")
-            return []
-
-    def firstcom(s):  #Find first complement
-        for i in range(len(s)):
-            if s[i]=='0':
-                s[i]='1'
-            elif s[i]=='1':
-                s[i]='0'
-        return s
-
-    def calculate_checksum(self, f):   # Main function to find checksum of a packet
-        sum=[['0','0','0','0','0','0','0','0','0','0','0','0','0','0','0','0']]
-        count=0
-        for  i in f:
-            if len(i)==2:
-                sum.append(self.Convert_to_bits(i))
-                count+=1
-        if count==2:
-            s=list(sum[1:3])
-            s = self.summ(s)
-            s = self.firstcom(s)
-            s=''.join(s)
-            return(s)
-        elif count==1:
-            return(''.join(self.firstcom(sum[1])))
-        else:
-            return(''.join(self.firstcom(sum[0])))
-
-
-    def packets_checksum(self, packets):  #start of checksum calculation
-        try:
-            s=[]
-            Convert_to_bits=[]
-            for i in range(len(packets)):
-                    f=''.join(packets[i])
-                    s.append(f.split())
-                    Convert_to_bits.append(self.calculate_checksum(f.split()))
-            return(Convert_to_bits)
-        except Exception as e:
-            print('cant do it')
-
-    def create_packet(packet,Convert_to_bits,seq):
-        f = ''.join(packet)+'/r'+Convert_to_bits+'/r'+str(seq)
-        return(f)
-
-    def rdt_send(self, data):
-        packet_size=5
-        packetss = self.packet_division(data,packet_size)
-        print("Number of packets made",int(len(packetss)))
-        Convert_to_bits=self.packets_checksum(packetss)
-        sequence_number=0
-        for i in range(len(packetss)):
-            count=1
-            timeoutflag=0
-            message = self.create_packet(packetss[i],Convert_to_bits[i],sequence_number)
-            print("Sending packet",i,"with checksum",str(Convert_to_bits[i]),"and sequence number",sequence_number)
-            if sequence_number==1:
-                sequence_number=0
-            else:
-                sequence_number=1
-            self.socket_udp.sendto(message.encode(),self.addr)
-            while True:
-                try:
-                    modifiedMessage, serverAddress = self.socket_udp.recvfrom(2048)
-                    break
-                except Exception as aa:
-                    count+=1
-                    if count==100000:
-                        print("Timeout")
-                        timeoutflag=1
-                        break
-            if timeoutflag==1:
-                i-=1
-                if sequence_number==1:
-                    sequence_number=0
-                else:
-                    sequence_number=1
-                continue
-            modifiedMessage=modifiedMessage.decode()
-            modifiedMessage= modifiedMessage.split('/r')
-            s=[]
-            s.append(list(str(modifiedMessage[1])))
-            s.append(list('0100000101001011'))
-            ff = self.summ(s)
-            if ('0'  in ff) or (sequence_number==int(modifiedMessage[2])):
-                i-=1
-                if sequence_number==1:
-                    sequence_number=0
-                else:
-                    sequence_number=1
-            else:
-                print("Acknowledgement of packet with sequence number",modifiedMessage[2],"received")
-        message="/r/r"
-        self.socket_udp.sendto(message.encode(),self.addr)
-        return
 
 class Login:
 
